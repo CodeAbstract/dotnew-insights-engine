@@ -1,0 +1,13 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  uuid: MyString
+  ip_address: MyString
+  user_agent: MyString
+  first_visit_at: 2025-05-14 18:44:33
+
+two:
+  uuid: MyString
+  ip_address: MyString
+  user_agent: MyString
+  first_visit_at: 2025-05-14 18:44:33

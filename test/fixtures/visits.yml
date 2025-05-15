@@ -1,0 +1,29 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  visitor: one
+  page_path: MyString
+  referrer: MyString
+  device_type: MyString
+  source_type: MyString
+  country_code: MyString
+  region: MyString
+  city: MyString
+  duration: 1
+  bounced: false
+  entered_at: 2025-05-14 18:44:47
+  exited_at: 2025-05-14 18:44:47
+
+two:
+  visitor: two
+  page_path: MyString
+  referrer: MyString
+  device_type: MyString
+  source_type: MyString
+  country_code: MyString
+  region: MyString
+  city: MyString
+  duration: 1
+  bounced: false
+  entered_at: 2025-05-14 18:44:47
+  exited_at: 2025-05-14 18:44:47
