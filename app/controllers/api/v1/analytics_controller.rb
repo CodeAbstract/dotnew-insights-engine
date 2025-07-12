@@ -152,7 +152,7 @@ module Api
       end
       
       def track_params
-        params.permit(:visitor_uuid, :page_path)
+        params.permit(:visitor_uuid, :page_path, :site_url, :app_name)
       end
       
       def stats_params

@@ -1,3 +1,26 @@
+# == Schema Information
+#
+# Table name: visits
+#
+#  id           :bigint           not null, primary key
+#  visitor_id   :bigint           not null
+#  page_path    :string
+#  referrer     :string
+#  device_type  :string
+#  source_type  :string
+#  country_code :string
+#  region       :string
+#  city         :string
+#  duration     :integer
+#  bounced      :boolean
+#  entered_at   :datetime
+#  exited_at    :datetime
+#  site_url     :string
+#  app_name     :string
+#  created_at   :datetime         not null
+#  updated_at   :datetime         not null
+#
+
 class Visit < ApplicationRecord
   belongs_to :visitor
   has_many :page_views, dependent: :destroy
@@ -5,6 +28,10 @@ class Visit < ApplicationRecord
   validates :page_path, presence: true
   validates :entered_at, presence: true
   validates :page_views_count, numericality: { greater_than_or_equal_to: 0 }
+
+  # Optionally, you can add validations for site_url and app_name if needed
+  # validates :site_url, presence: true
+  # validates :app_name, presence: true
 
   before_save :set_duration, if: :exited_at_changed?
   before_save :update_bounce_status, if: :page_views_count_changed?

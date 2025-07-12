@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_05_15_032716) do
+ActiveRecord::Schema[8.0].define(version: 2025_07_12_091246) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -52,6 +52,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_15_032716) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.integer "page_views_count", default: 0, null: false
+    t.string "site_url"
+    t.string "app_name"
     t.index ["bounced"], name: "index_visits_on_bounced"
     t.index ["country_code"], name: "index_visits_on_country_code"
     t.index ["device_type"], name: "index_visits_on_device_type"

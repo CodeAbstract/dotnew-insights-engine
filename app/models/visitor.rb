@@ -39,37 +39,15 @@ class Visitor < ApplicationRecord
   end
 
   def validate_ip_address
-    # Allow empty IP for validation chain
     return if ip_address.blank?
     
-    # Try to parse the IP address
-    begin
-      # Handle special cases
-      return if ip_address == 'localhost' ||
-                ip_address == '127.0.0.1' ||
-                ip_address == '::1' ||
-                ip_address.start_with?('192.168.') ||
-                ip_address.start_with?('10.') ||
-                ip_address.start_with?('172.')
-      
-      # Try to parse as IPv4
-      if ip_address.include?('.')
-        parts = ip_address.split('.')
-        if parts.length == 4 && parts.all? { |part| part.to_i.between?(0, 255) }
-          return
-        end
-      end
-      
-      # Try to parse as IPv6
-      if ip_address.include?(':')
-        require 'ipaddr'
-        IPAddr.new(ip_address)
-        return
-      end
-      
-      errors.add(:ip_address, 'is not a valid IP address')
-    rescue IPAddr::InvalidAddressError
-      errors.add(:ip_address, 'is not a valid IP address')
+    # IPv4 format validation with octet range check
+    ipv4_regex = /\A(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\z/
+    # IPv6 format validation (basic)
+    ipv6_regex = /\A(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}\z/
+    
+    unless ip_address.match?(ipv4_regex) || ip_address.match?(ipv6_regex)
+      errors.add(:ip_address, 'must be a valid IPv4 or IPv6 address')
     end
   end
 end

@@ -1,28 +1,39 @@
 # DotNew Insights Engine
 
-A custom analytics API built with Rails 8 that provides detailed website traffic analysis, visitor tracking, and statistical reporting. The engine uses anonymous visitor tracking with UUID-based identification, making it easy to integrate with any frontend application without requiring user authentication.
+A custom analytics API built with Rails 8 that provides detailed website traffic analysis, visitor tracking, and statistical reporting.
 
 ## Core Features
 
 1. **Visit Tracking**
-   - Records visitor information with unique identifiers
-   - Tracks session data including entry/exit times
-   - Calculates bounce rates automatically
+   - Records visitor information with unique UUIDs
+   - Tracks session data with entry/exit times
+   - Calculates bounce rates based on page view count
+   - Tracks visit duration automatically
 
-2. **Traffic Source Analysis**
-   - Identifies traffic sources (direct, search, referral, social)
-   - Detects device types (desktop, mobile, tablet)
-   - Records geographical data (country, region, city)
+2. **Traffic Analysis**
+   - Detects traffic sources (direct, search, referral, social)
+   - Identifies device types (desktop, mobile, tablet)
+   - Records geographical data via MaxMind GeoIP2 (country, region, city)
+   - Handles local and private IP addresses
 
 3. **Page Analytics**
    - Tracks page views with timestamps
-   - Associates views with specific visits and visitors
+   - Associates views with visits and visitors
+   - Maintains page view counts per visit
    - Provides path-based analytics
 
 4. **Statistical Reporting**
-   - Offers flexible timeframe reporting (day, week, month, year)
-   - Calculates key metrics like bounce rate and visit duration
-   - Provides aggregated data by various dimensions
+   - Offers flexible timeframes (day, week, month, year)
+   - Provides summary statistics:
+     - Total visits and unique visitors
+     - Page view counts
+     - Bounce rates
+     - Average visit duration
+   - Groups data by:
+     - Traffic sources
+     - Device types
+     - Geographic locations
+     - Page paths
 
 ## Requirements
 
@@ -73,6 +84,59 @@ const config = {
 };
 
 export default config[process.env.NODE_ENV || 'development'];
+```
+
+### React with JavaScript
+
+The implementation is similar to TypeScript but without type definitions:
+
+```javascript
+// src/hooks/useAnalytics.js
+import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import config from '../config/analytics';
+
+export const useAnalytics = () => {
+  const location = useLocation();
+
+  const trackPageView = async (path) => {
+    try {
+      const visitorUuid = localStorage.getItem('visitor_uuid');
+      const data = {
+        page_path: path,
+        visitor_uuid: visitorUuid,
+      };
+
+      const response = await fetch(`${config.apiBaseUrl}/analytics/track`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+      if (result.visitor_uuid) {
+        localStorage.setItem('visitor_uuid', result.visitor_uuid);
+      }
+      if (result.visit_id) {
+        sessionStorage.setItem('visit_id', result.visit_id.toString());
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Analytics tracking error:', error);
+      return {};
+    }
+  };
+
+  useEffect(() => {
+    trackPageView(location.pathname);
+  }, [location.pathname]);
+
+  return { trackPageView };
+};
 ```
 
 ### React with TypeScript
@@ -142,59 +206,6 @@ import { useAnalytics } from './hooks/useAnalytics';
 const App: React.FC = () => {
   useAnalytics(); // This will automatically track page views
   return <div>{/* Your app content */}</div>;
-};
-```
-
-### React with JavaScript
-
-The implementation is similar to TypeScript but without type definitions:
-
-```javascript
-// src/hooks/useAnalytics.js
-import { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
-import config from '../config/analytics';
-
-export const useAnalytics = () => {
-  const location = useLocation();
-
-  const trackPageView = async (path) => {
-    try {
-      const visitorUuid = localStorage.getItem('visitor_uuid');
-      const data = {
-        page_path: path,
-        visitor_uuid: visitorUuid,
-      };
-
-      const response = await fetch(`${config.apiBaseUrl}/analytics/track`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      const result = await response.json();
-      if (result.visitor_uuid) {
-        localStorage.setItem('visitor_uuid', result.visitor_uuid);
-      }
-      if (result.visit_id) {
-        sessionStorage.setItem('visit_id', result.visit_id.toString());
-      }
-
-      return result;
-    } catch (error) {
-      console.error('Analytics tracking error:', error);
-      return {};
-    }
-  };
-
-  useEffect(() => {
-    trackPageView(location.pathname);
-  }, [location.pathname]);
-
-  return { trackPageView };
 };
 ```
 
@@ -371,6 +382,7 @@ SECRET_KEY_BASE=your_secret_key_base
 
 ```ruby
 # config/environments/production.rb
+config.assume_ssl = true
 config.force_ssl = true
 config.ssl_options = {
   hsts: { subdomains: true, preload: true, expires: 1.year }
@@ -379,28 +391,29 @@ config.ssl_options = {
 
 ### Cross-Origin Resource Sharing (CORS)
 Strict CORS configuration with:
-- Explicit allowed origins (environment-specific)
-- Credentials support
+- Environment-specific origins:
+  - Development: localhost:3000, localhost:5173, localhost:8080
+  - Production: Configurable via ALLOWED_ORIGINS
+- Credentials support enabled
 - Controlled HTTP methods
-- Development-specific settings for local testing
+- Special handling for development assets
 
 ```ruby
 # config/initializers/cors.rb
 Rails.application.config.middleware.insert_before 0, Rack::Cors do
   allow do
     if Rails.env.development?
-      # In development, allow localhost origins
-      origins 'localhost:3000', '127.0.0.1:3000', 'localhost:5173', '127.0.0.1:5173',
-              'localhost:8080', '127.0.0.1:8080'
+      origins 'localhost:3000', '127.0.0.1:3000', 'localhost:5173', 
+              'localhost:8080'
     else
-      # In production, only allow specific domains
       origins ENV.fetch('ALLOWED_ORIGINS', '').split(',')
     end
 
     resource '*',
       headers: :any,
       methods: [:get, :post, :put, :patch, :delete, :options, :head],
-      credentials: true
+      credentials: true,
+      expose: ['Authorization']
   end
 end
 ```
@@ -411,114 +424,33 @@ Using `rack-attack` for request throttling and blocking:
 ```ruby
 # config/initializers/rack_attack.rb
 # Global rate limit
-throttle('req/ip', limit: ENV.fetch('GLOBAL_RATE_LIMIT', 300).to_i, period: ENV.fetch('GLOBAL_RATE_LIMIT_PERIOD', 300).to_i)
+throttle('req/ip', limit: ENV.fetch('GLOBAL_RATE_LIMIT', 300).to_i, 
+         period: ENV.fetch('GLOBAL_RATE_LIMIT_PERIOD', 300).to_i)
 
 # Analytics endpoint specific limit
-throttle('analytics/track/ip', limit: ENV.fetch('TRACK_RATE_LIMIT', 60).to_i, period: ENV.fetch('TRACK_RATE_LIMIT_PERIOD', 60).to_i)
+throttle('analytics/track/ip', limit: ENV.fetch('TRACK_RATE_LIMIT', 60).to_i,
+         period: ENV.fetch('TRACK_RATE_LIMIT_PERIOD', 60).to_i)
 
-# API rate limit
-throttle('api/ip', limit: ENV.fetch('API_RATE_LIMIT_MAX_REQUESTS', 100).to_i, period: ENV.fetch('API_RATE_LIMIT_WINDOW', 300).to_i)
-
-# Block suspicious requests (Fail2Ban)
+# Block suspicious requests
 blocklist('block suspicious requests') do |req|
-  Rack::Attack::Fail2Ban.filter("pentesters-#{req.ip}", maxretry: 3, findtime: 10.minutes, bantime: 1.hour)
+  Rack::Attack::Fail2Ban.filter("pentesters-#{req.ip}",
+    maxretry: 3, findtime: 10.minutes, bantime: 1.hour)
 end
 ```
 
-### Security Headers
-Comprehensive security headers implemented:
+
+### Environment Variables Validation
+Required environment variables are validated in production:
 ```ruby
-- X-Frame-Options: SAMEORIGIN
-- X-XSS-Protection: 1; mode=block
-- X-Content-Type-Options: nosniff
-- X-Download-Options: noopen
-- X-Permitted-Cross-Domain-Policies: none
-- Referrer-Policy: strict-origin-when-cross-origin
-- Content-Security-Policy: default-src 'self'; frame-ancestors 'none'
-- Permissions-Policy: camera=(), microphone=(), geolocation=()
+# config/initializers/environment_variables.rb
+REQUIRED_VARIABLES = {
+  'DATABASE_URL' => 'Database connection URL',
+  'RAILS_MASTER_KEY' => 'Rails master key for credentials',
+  'SECRET_KEY_BASE' => 'Secret key base for Rails',
+  'GEOIP_LICENSE_KEY' => 'GeoIP service license key',
+  'GEOIP_ACCOUNT_ID' => 'GeoIP service account ID'
+}
 ```
-
-### Database Security
-- SSL enforced for database connections in production
-- Credentials managed via environment variables
-- Connection pooling configured via `RAILS_MAX_THREADS`
-
-### Input Validation and Sanitization
-Model-level validations:
-```ruby
-# app/models/visitor.rb
-validates :uuid, presence: true, uniqueness: true
-validates :ip_address, presence: true
-validates :user_agent, presence: true, length: { maximum: 500 }
-
-# Input sanitization
-before_validation :sanitize_inputs
-```
-
-### Parameter Filtering
-Sensitive parameters filtered from logs:
-```ruby
-# config/initializers/filter_parameter_logging.rb
-Rails.application.config.filter_parameters += [
-  :passw, :secret, :token, :_key, :crypt, :salt, :certificate, :otp, :ssn,
-  :credit_card, :card_number, :auth, :api_key, :access_token, :bearer_token,
-  :jwt, :refresh_token, :cookie, :session, :password_confirmation, :secret_key,
-  :private_key, :email
-]
-```
-
-### Error Handling
-Secure error handling implementation:
-```ruby
-# app/controllers/concerns/error_handler.rb
-module ErrorHandler
-  extend ActiveSupport::Concern
-
-  included do
-    rescue_from StandardError do |e|
-      handle_error(e)
-    end
-
-    private
-
-    def handle_error(error)
-      case error
-      when ActiveRecord::RecordNotFound
-        render_error(:not_found, error.message)
-      when ActiveRecord::RecordInvalid
-        render_error(:unprocessable_entity, error.record.errors.full_messages)
-      else
-        Rails.logger.error("Unexpected error: #{error.class} - #{error.message}")
-        render_error(:internal_server_error, 'An unexpected error occurred')
-      end
-    end
-  end
-end
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
-
-## Support
-
-For support, please:
-1. Check the [documentation](docs/)
-2. Search [existing issues](issues/)
-3. Create a new issue if needed
-
-## Authors
-
-- New Aguda - (https://github.com/codeabstract)
-
 
 ## Best Practices Implemented
 
@@ -547,7 +479,6 @@ The application follows the Service Objects pattern to encapsulate business logi
 1. **Versioning**
    ```
    /api/v1/analytics/track
-   /api/v1/analytics/stats
    ```
 
 2. **Error Handling**
@@ -570,110 +501,22 @@ The application follows the Service Objects pattern to encapsulate business logi
    - Proper HTTP status codes
    - Consistent error structure
 
-### Security Measures
-- Rate limiting and request throttling
-- Error message sanitization
-- Proper error logging
-- IP address validation
-- User agent sanitization
-- CORS protection
-- SSL/TLS in production
-- Parameter filtering
-- Input validation
-
-### Performance Optimizations
-- Counter cache for page views
-- Database query optimization
-- Efficient scopes
-- Caching of expensive operations
-
-### Code Organization
-```
-app/
-├── controllers/
-│   ├── api/
-│   │   └── v1/
-│   │       └── analytics_controller.rb
-│   └── concerns/
-│       └── error_handler.rb
-├── models/
-│   ├── visitor.rb
-│   ├── visit.rb
-│   └── page_view.rb
-└── services/
-    └── analytics/
-        ├── visit_tracker_service.rb
-        ├── geo_location_service.rb
-        ├── device_detector_service.rb
-        ├── source_detector_service.rb
-        └── stats_service.rb
-```
-
-### Testing (Recommended)
-- Unit tests for models and services
-- Integration tests for API endpoints
-- Test coverage for error scenarios
-- Performance testing for analytics
-
-### Documentation
-- API documentation
-- Code documentation
-- Implementation guides
-- Security guidelines
-
-## Testing Suite
+### Testing
 
 The application includes a comprehensive testing suite using RSpec. The tests cover models, services, and controllers, ensuring the reliability and correctness of the analytics engine.
 
-### Test Structure
-
-```
-spec/
-├── models/
-│   ├── visitor_spec.rb
-│   ├── visit_spec.rb
-│   └── page_view_spec.rb
-├── services/
-│   └── analytics/
-│       ├── visit_tracker_service_spec.rb
-│       ├── geo_location_service_spec.rb
-│       ├── device_detector_service_spec.rb
-│       ├── source_detector_service_spec.rb
-│       └── stats_service_spec.rb
-├── controllers/
-│   └── api/
-│       └── v1/
-│           └── analytics_controller_spec.rb
-└── factories/
-    ├── visitors.rb
-    ├── visits.rb
-    └── page_views.rb
-```
-
 ### Test Coverage
 
-- **Model Tests**: Validate associations, validations, scopes, and instance methods
-- **Service Tests**: Ensure business logic works correctly
-- **Controller Tests**: Verify API endpoints and error handling
-- **Factory Definitions**: Provide test data generators
+The application has a comprehensive test suite with RSpec, achieving an overall line coverage of **94.35%** (284/301 lines).
 
-### Running Tests
+### Running Tests with Coverage
 
 ```bash
-# Install test dependencies
-bundle install
-
-# Run the entire test suite
-bundle exec rspec
-
-# Run specific test file
-bundle exec rspec spec/models/visitor_spec.rb
-
-# Run with coverage report
+# Run tests with coverage report
 COVERAGE=true bundle exec rspec
 
-# Run tests in parallel
-bundle exec parallel_rspec spec/
+# View detailed coverage report
+open coverage/index.html
 ```
 
 ### Test Tools and Libraries
@@ -688,21 +531,6 @@ bundle exec parallel_rspec spec/
 - **WebMock**: Mock HTTP requests
 - **Timecop**: Time manipulation in tests
 
-### Continuous Integration
-
-The test suite is integrated with CI/CD pipelines and runs:
-- On every pull request
-- Before deployment to staging
-- Before deployment to production
-
-### Code Coverage Requirements
-
-- Minimum coverage threshold: 95%
-- Critical paths require 100% coverage:
-  - Visit tracking
-  - Analytics calculations
-  - API endpoints
-  - Error handling
 
 ## Environment Variables
 
@@ -745,16 +573,26 @@ API_RATE_LIMIT_MAX_REQUESTS=100
 API_RATE_LIMIT_WINDOW=300 # 5 minutes in seconds
 ```
 
-### Setting Up Environment Variables
+## Contributing
 
-1. Copy the example file:
-   ```bash
-   cp .env.example .env
-   ```
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-2. Edit `.env` with your specific values:
-   ```bash
-   vim .env
-   ```
+## License
 
-3. For production, ensure all required variables are set in your deployment environment.
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
+
+## Support
+
+For support, please:
+1. Check the [documentation](docs/)
+2. Search [existing issues](issues/)
+3. Create a new issue if needed
+
+
+## Author/s
+
+- Code Abstract - (https://github.com/codeabstract)

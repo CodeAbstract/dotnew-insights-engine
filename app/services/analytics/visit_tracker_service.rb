@@ -48,7 +48,9 @@ module Analytics
         country_code: geo_data[:country_code],
         region: geo_data[:region],
         city: geo_data[:city],
-        entered_at: Time.current
+        entered_at: Time.current,
+        site_url: params[:site_url],
+        app_name: params[:app_name]
       )
     end
 

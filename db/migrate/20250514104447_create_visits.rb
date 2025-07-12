@@ -13,6 +13,8 @@ class CreateVisits < ActiveRecord::Migration[8.0]
       t.boolean :bounced
       t.datetime :entered_at
       t.datetime :exited_at
+      t.string :site_url
+      t.string :app_name
 
       t.timestamps
     end

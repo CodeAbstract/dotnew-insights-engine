@@ -1,3 +1,5 @@
+require 'maxmind/db'
+
 module Analytics
   class GeoLocationService
     attr_reader :ip_address
@@ -10,11 +12,11 @@ module Analytics
       return default_location if ip_address.blank? || local_ip?
       
       begin
-        geoip_result = geoip_client.city(ip_address)
+        geoip_result = geoip_client.get(ip_address)
         {
-          country_code: geoip_result.country.iso_code,
-          region: geoip_result.subdivisions.most_specific.name,
-          city: geoip_result.city.name
+          country_code: geoip_result['country']['iso_code'],
+          region: geoip_result['subdivisions']&.first&.fetch('name', 'Unknown'),
+          city: geoip_result['city']&.fetch('name', 'Unknown')
         }
       rescue StandardError => e
         Rails.logger.error("GeoIP lookup failed: #{e.message}")
@@ -40,8 +42,9 @@ module Analytics
     end
 
     def geoip_client
-      @geoip_client ||= GeoIP2::Database.new(
-        Rails.root.join('db', 'GeoLite2-City.mmdb')
+      @geoip_client ||= MaxMind::DB.new(
+        Rails.root.join('db', 'GeoLite2-City.mmdb'),
+        mode: MaxMind::DB::MODE_MEMORY
       )
     end
   end
