@@ -7,13 +7,30 @@
 
 Rails.application.config.middleware.insert_before 0, Rack::Cors do
   allow do
-    # Replace with your actual frontend domain(s)
-    origins 'https://your-frontend-domain.com', 'https://www.your-frontend-domain.com'
+    if Rails.env.development?
+      # In development, allow localhost origins
+      origins 'localhost:3000', '127.0.0.1:3000', 'localhost:5173', '127.0.0.1:5173',
+              'localhost:8080', '127.0.0.1:8080'
+    else
+      # In production, only allow specific domains
+      origins ENV.fetch('ALLOWED_ORIGINS', '').split(',')
+    end
 
     resource '*',
       headers: :any,
       methods: [:get, :post, :put, :patch, :delete, :options, :head],
       credentials: true,
-      expose: ['Authorization'] # If you're using token-based auth
+      expose: ['Authorization']
+  end
+
+  # For development assets (if needed)
+  if Rails.env.development?
+    allow do
+      origins '*'
+      resource '/assets/*',
+        headers: :any,
+        methods: [:get, :options],
+        credentials: false
+    end
   end
 end
