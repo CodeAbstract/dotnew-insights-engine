@@ -36,19 +36,9 @@ gem "thruster", require: false
 gem "rack-cors"
 gem "geoip2"
 
-# For API authentication
-gem 'devise'
-gem 'devise-jwt'
-# For authorization
-gem 'pundit'
 # For rate limiting
 gem 'rack-attack'
 gem 'rack-attack-rate-limit', group: :production
-
-# Monitoring & Logging
-gem 'sentry-ruby'
-gem 'sentry-rails'
-gem 'paper_trail'
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem

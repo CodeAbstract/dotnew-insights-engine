@@ -1,6 +1,6 @@
 # DotNew Insights Engine
 
-A comprehensive analytics API built with Rails 8 that provides detailed website traffic analysis, visitor tracking, and statistical reporting.
+A custom analytics API built with Rails 8 that provides detailed website traffic analysis, visitor tracking, and statistical reporting. The engine uses anonymous visitor tracking with UUID-based identification, making it easy to integrate with any frontend application without requiring user authentication.
 
 ## Core Features
 
@@ -45,19 +45,9 @@ gem 'puma', '>= 5.0'
 gem 'rack-cors'
 gem 'geoip2'
 
-# Authentication & Authorization
-gem 'devise'
-gem 'devise-jwt'
-gem 'pundit'
-
 # Security
 gem 'rack-attack'
 gem 'rack-attack-rate-limit'
-
-# Monitoring & Logging
-gem 'sentry-ruby'
-gem 'sentry-rails'
-gem 'paper_trail'
 
 # Performance & Caching
 gem 'solid_cache'
@@ -65,7 +55,242 @@ gem 'solid_queue'
 gem 'solid_cable'
 ```
 
-## Configuration
+## Frontend Integration Guides
+
+### Common Setup
+
+First, create a configuration file for your analytics endpoints:
+
+```javascript
+// src/config/analytics.js (or .ts)
+const config = {
+  development: {
+    apiBaseUrl: process.env.REACT_APP_API_URL || 'http://localhost:3000/api/v1',
+  },
+  production: {
+    apiBaseUrl: process.env.REACT_APP_API_URL || 'https://your-api-domain.com/api/v1',
+  },
+};
+
+export default config[process.env.NODE_ENV || 'development'];
+```
+
+### React with TypeScript
+
+Create the analytics hook:
+
+```typescript
+// src/hooks/useAnalytics.ts
+import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import config from '../config/analytics';
+
+interface VisitData {
+  visitor_uuid?: string;
+  visit_id?: number;
+}
+
+export const useAnalytics = () => {
+  const location = useLocation();
+
+  const trackPageView = async (path: string): Promise<VisitData> => {
+    try {
+      const visitorUuid = localStorage.getItem('visitor_uuid');
+      const data = {
+        page_path: path,
+        visitor_uuid: visitorUuid,
+      };
+
+      const response = await fetch(`${config.apiBaseUrl}/analytics/track`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+      if (result.visitor_uuid) {
+        localStorage.setItem('visitor_uuid', result.visitor_uuid);
+      }
+      if (result.visit_id) {
+        sessionStorage.setItem('visit_id', result.visit_id.toString());
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Analytics tracking error:', error);
+      return {};
+    }
+  };
+
+  useEffect(() => {
+    trackPageView(location.pathname);
+  }, [location.pathname]);
+
+  return { trackPageView };
+};
+```
+
+Usage in components:
+
+```typescript
+// src/App.tsx
+import { useAnalytics } from './hooks/useAnalytics';
+
+const App: React.FC = () => {
+  useAnalytics(); // This will automatically track page views
+  return <div>{/* Your app content */}</div>;
+};
+```
+
+### React with JavaScript
+
+The implementation is similar to TypeScript but without type definitions:
+
+```javascript
+// src/hooks/useAnalytics.js
+import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import config from '../config/analytics';
+
+export const useAnalytics = () => {
+  const location = useLocation();
+
+  const trackPageView = async (path) => {
+    try {
+      const visitorUuid = localStorage.getItem('visitor_uuid');
+      const data = {
+        page_path: path,
+        visitor_uuid: visitorUuid,
+      };
+
+      const response = await fetch(`${config.apiBaseUrl}/analytics/track`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+      if (result.visitor_uuid) {
+        localStorage.setItem('visitor_uuid', result.visitor_uuid);
+      }
+      if (result.visit_id) {
+        sessionStorage.setItem('visit_id', result.visit_id.toString());
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Analytics tracking error:', error);
+      return {};
+    }
+  };
+
+  useEffect(() => {
+    trackPageView(location.pathname);
+  }, [location.pathname]);
+
+  return { trackPageView };
+};
+```
+
+### Next.js Integration
+
+For Next.js applications, create the analytics component:
+
+```typescript
+// src/components/Analytics.tsx (or .jsx)
+'use client';
+
+import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
+import config from '@/config/analytics';
+
+export function Analytics() {
+  const pathname = usePathname();
+
+  const trackPageView = async (path: string) => {
+    try {
+      const visitorUuid = localStorage.getItem('visitor_uuid');
+      const data = {
+        page_path: path,
+        visitor_uuid: visitorUuid,
+      };
+
+      const response = await fetch(`${config.apiBaseUrl}/analytics/track`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+      if (result.visitor_uuid) {
+        localStorage.setItem('visitor_uuid', result.visitor_uuid);
+      }
+      if (result.visit_id) {
+        sessionStorage.setItem('visit_id', result.visit_id.toString());
+      }
+    } catch (error) {
+      console.error('Analytics tracking error:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      trackPageView(pathname);
+    }
+  }, [pathname]);
+
+  return null;
+}
+```
+
+Add to your app layout:
+
+```typescript
+// src/app/layout.tsx (or .jsx)
+import { Analytics } from '@/components/Analytics';
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <Analytics />
+        {children}
+      </body>
+    </html>
+  );
+}
+```
+
+### Environment Setup
+
+For all frontend applications, set up your environment variables:
+
+```bash
+# .env.development
+REACT_APP_API_URL=http://localhost:3000/api/v1
+# or for Next.js
+NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
+
+# .env.production
+REACT_APP_API_URL=https://your-api-domain.com/api/v1
+# or for Next.js
+NEXT_PUBLIC_API_URL=https://your-api-domain.com/api/v1
+```
+
+## Backend Configuration
 
 ### Initial Setup
 ```bash
@@ -107,145 +332,8 @@ ALLOWED_ORIGINS=https://your-frontend-domain.com,https://www.your-frontend-domai
 RAILS_MASTER_KEY=your_master_key
 SECRET_KEY_BASE=your_secret_key_base
 
-# Monitoring
-SENTRY_DSN=your_sentry_dsn
+
 ```
-
-### Database Creation and Setup
-```bash
-# Create databases
-rails db:create
-
-# Run migrations
-rails db:migrate
-
-# Add indexes for analytics queries
-rails db:migrate:analytics_indexes
-
-# Seed initial data (if needed)
-rails db:seed
-```
-
-## Testing
-
-The project includes a comprehensive test suite with both unit tests and integration tests using RSpec.
-
-### Test Structure
-
-```bash
-spec/
-├── models/           # Unit tests for models
-├── controllers/      # Integration tests for API endpoints
-│   └── api/
-│       └── v1/
-├── factories/        # Factory definitions
-├── support/         # Test helpers and shared examples
-├── rails_helper.rb  # Rails-specific configuration
-└── spec_helper.rb   # RSpec configuration
-```
-
-### Test Types
-
-#### Unit Tests
-Located in `spec/models/`, these tests verify individual components in isolation:
-- Model validations
-- Associations
-- Instance methods
-- Class methods
-- Business logic
-
-Example of a model test:
-```ruby
-RSpec.describe Visitor, type: :model do
-  describe 'validations' do
-    it { should validate_presence_of(:uuid) }
-    it { should validate_uniqueness_of(:uuid) }
-  end
-
-  describe 'associations' do
-    it { should have_many(:visits) }
-  end
-end
-```
-
-#### Integration Tests
-Located in `spec/controllers/api/v1/`, these tests verify:
-- API endpoint functionality
-- Request-response cycles
-- Database interactions
-- JSON response structures
-- Error handling
-- Edge cases
-
-Example of an API controller test:
-```ruby
-RSpec.describe Api::V1::AnalyticsController, type: :controller do
-  describe 'POST #track' do
-    it 'creates a new visit' do
-      post :track, params: { page_path: '/test' }
-      expect(response).to have_http_status(:ok)
-    end
-  end
-end
-```
-
-### Test Dependencies
-
-The test suite uses several key testing gems:
-- **RSpec**: Testing framework
-- **FactoryBot**: Test data generation
-- **Shoulda Matchers**: Simplified testing syntax
-- **Database Cleaner**: Test database management
-- **SimpleCov**: Test coverage reporting
-- **VCR**: HTTP interaction recording
-- **WebMock**: HTTP request stubbing
-
-### Running Tests
-
-```bash
-# Run the entire test suite
-bundle exec rspec
-
-# Run specific test file
-bundle exec rspec spec/models/visitor_spec.rb
-
-# Run tests with coverage report
-COVERAGE=true bundle exec rspec
-
-# Run tests by type
-bundle exec rspec spec/models/        # Run only unit tests
-bundle exec rspec spec/controllers/   # Run only integration tests
-
-# Run tests with specific tag
-bundle exec rspec --tag focus
-
-# Run tests with detailed output
-bundle exec rspec --format documentation
-```
-
-### Test Coverage
-
-To view test coverage:
-1. Run tests with coverage enabled: `COVERAGE=true bundle exec rspec`
-2. Open `coverage/index.html` in your browser
-3. Review coverage metrics and identify areas needing additional testing
-
-### Writing New Tests
-
-When adding new features, follow these testing guidelines:
-1. Write tests before implementing features (TDD)
-2. Include both happy and sad path scenarios
-3. Use meaningful context and description blocks
-4. Follow the existing test patterns
-5. Use factories instead of fixtures
-6. Keep tests focused and isolated
-
-### Continuous Integration
-
-Tests are automatically run in the CI pipeline on:
-- Pull requests
-- Merges to main branch
-- Release tags
 
 ## API Documentation
 
@@ -271,74 +359,142 @@ Tests are automatically run in the CI pipeline on:
 ### Get Analytics Stats
 `GET /api/v1/analytics/stats?timeframe=day`
 
-## Client-Side Integration
-
-### JavaScript Tracker
-```javascript
-// analytics.js
-class Analytics {
-  constructor() {
-    this.visitorUuid = localStorage.getItem('visitor_uuid');
-    this.visitId = sessionStorage.getItem('visit_id');
-    this.trackPageView();
-    this.setupEventListeners();
-  }
-  
-  // ... rest of the implementation
-}
-
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
-  window.analytics = new Analytics();
-});
-```
-
-## Deployment
-
-### Production Deployment Guidelines
-```bash
-# Build the application
-RAILS_ENV=production rails assets:precompile  # If using assets
-RAILS_ENV=production rails db:migrate         # Run any pending migrations
-
-# Set up environment variables
-# Make sure all required environment variables are set in your production environment
-# See the Configuration section above for required variables
-```
-
-### Production Considerations
-- Enable SSL in production
-- Configure proper CORS settings
-- Set up monitoring with Sentry
-- Configure rate limiting
-- Enable database SSL connections
-- Set up proper logging
-- Configure proper database backups
-- Set up health monitoring
-- Implement proper caching strategy
-
-### Deployment Checklist
-1. Security
-   - All environment variables are properly set
-   - SSL certificates are valid and installed
-   - Security headers are configured
-   - Database connections are secure
-
-2. Performance
-   - Database indexes are in place
-   - Caching is configured
-   - Rate limiting is set up
-   - Background jobs are configured
-
-3. Monitoring
-   - Error tracking is set up (Sentry)
-   - Performance monitoring is in place
-   - Logging is properly configured
-   - Alerts are set up for critical issues
-
 ## Security
 
-Refer to [SECURITY_GUIDE.md](SECURITY_GUIDE.md) for detailed security measures and best practices.
+### Transport Layer Security (TLS)
+- Forced SSL in production environment
+- HSTS (HTTP Strict Transport Security) enabled with:
+  - Subdomains included
+  - Preload enabled
+  - 1-year expiration
+- SSL termination configured for reverse proxy setup
+
+```ruby
+# config/environments/production.rb
+config.force_ssl = true
+config.ssl_options = {
+  hsts: { subdomains: true, preload: true, expires: 1.year }
+}
+```
+
+### Cross-Origin Resource Sharing (CORS)
+Strict CORS configuration with:
+- Explicit allowed origins (environment-specific)
+- Credentials support
+- Controlled HTTP methods
+- Development-specific settings for local testing
+
+```ruby
+# config/initializers/cors.rb
+Rails.application.config.middleware.insert_before 0, Rack::Cors do
+  allow do
+    if Rails.env.development?
+      # In development, allow localhost origins
+      origins 'localhost:3000', '127.0.0.1:3000', 'localhost:5173', '127.0.0.1:5173',
+              'localhost:8080', '127.0.0.1:8080'
+    else
+      # In production, only allow specific domains
+      origins ENV.fetch('ALLOWED_ORIGINS', '').split(',')
+    end
+
+    resource '*',
+      headers: :any,
+      methods: [:get, :post, :put, :patch, :delete, :options, :head],
+      credentials: true
+  end
+end
+```
+
+### Rate Limiting and Request Filtering
+Using `rack-attack` for request throttling and blocking:
+
+```ruby
+# config/initializers/rack_attack.rb
+# Global rate limit
+throttle('req/ip', limit: ENV.fetch('GLOBAL_RATE_LIMIT', 300).to_i, period: ENV.fetch('GLOBAL_RATE_LIMIT_PERIOD', 300).to_i)
+
+# Analytics endpoint specific limit
+throttle('analytics/track/ip', limit: ENV.fetch('TRACK_RATE_LIMIT', 60).to_i, period: ENV.fetch('TRACK_RATE_LIMIT_PERIOD', 60).to_i)
+
+# API rate limit
+throttle('api/ip', limit: ENV.fetch('API_RATE_LIMIT_MAX_REQUESTS', 100).to_i, period: ENV.fetch('API_RATE_LIMIT_WINDOW', 300).to_i)
+
+# Block suspicious requests (Fail2Ban)
+blocklist('block suspicious requests') do |req|
+  Rack::Attack::Fail2Ban.filter("pentesters-#{req.ip}", maxretry: 3, findtime: 10.minutes, bantime: 1.hour)
+end
+```
+
+### Security Headers
+Comprehensive security headers implemented:
+```ruby
+- X-Frame-Options: SAMEORIGIN
+- X-XSS-Protection: 1; mode=block
+- X-Content-Type-Options: nosniff
+- X-Download-Options: noopen
+- X-Permitted-Cross-Domain-Policies: none
+- Referrer-Policy: strict-origin-when-cross-origin
+- Content-Security-Policy: default-src 'self'; frame-ancestors 'none'
+- Permissions-Policy: camera=(), microphone=(), geolocation=()
+```
+
+### Database Security
+- SSL enforced for database connections in production
+- Credentials managed via environment variables
+- Connection pooling configured via `RAILS_MAX_THREADS`
+
+### Input Validation and Sanitization
+Model-level validations:
+```ruby
+# app/models/visitor.rb
+validates :uuid, presence: true, uniqueness: true
+validates :ip_address, presence: true
+validates :user_agent, presence: true, length: { maximum: 500 }
+
+# Input sanitization
+before_validation :sanitize_inputs
+```
+
+### Parameter Filtering
+Sensitive parameters filtered from logs:
+```ruby
+# config/initializers/filter_parameter_logging.rb
+Rails.application.config.filter_parameters += [
+  :passw, :secret, :token, :_key, :crypt, :salt, :certificate, :otp, :ssn,
+  :credit_card, :card_number, :auth, :api_key, :access_token, :bearer_token,
+  :jwt, :refresh_token, :cookie, :session, :password_confirmation, :secret_key,
+  :private_key, :email
+]
+```
+
+### Error Handling
+Secure error handling implementation:
+```ruby
+# app/controllers/concerns/error_handler.rb
+module ErrorHandler
+  extend ActiveSupport::Concern
+
+  included do
+    rescue_from StandardError do |e|
+      handle_error(e)
+    end
+
+    private
+
+    def handle_error(error)
+      case error
+      when ActiveRecord::RecordNotFound
+        render_error(:not_found, error.message)
+      when ActiveRecord::RecordInvalid
+        render_error(:unprocessable_entity, error.record.errors.full_messages)
+      else
+        Rails.logger.error("Unexpected error: #{error.class} - #{error.message}")
+        render_error(:internal_server_error, 'An unexpected error occurred')
+      end
+    end
+  end
+end
+```
 
 ## Contributing
 
@@ -415,11 +571,15 @@ The application follows the Service Objects pattern to encapsulate business logi
    - Consistent error structure
 
 ### Security Measures
-- Parameter whitelisting
+- Rate limiting and request throttling
 - Error message sanitization
 - Proper error logging
 - IP address validation
 - User agent sanitization
+- CORS protection
+- SSL/TLS in production
+- Parameter filtering
+- Input validation
 
 ### Performance Optimizations
 - Counter cache for page views
@@ -562,6 +722,9 @@ SECRET_KEY_BASE=your_secret_key_base_here
 # GeoIP Configuration
 GEOIP_LICENSE_KEY=your_geoip_license_key_here
 GEOIP_ACCOUNT_ID=your_geoip_account_id_here
+
+# CORS Configuration
+ALLOWED_ORIGINS=https://your-frontend-domain.com,https://www.your-frontend-domain.com
 ```
 
 ### Optional Variables (with defaults)
@@ -595,5 +758,3 @@ API_RATE_LIMIT_WINDOW=300 # 5 minutes in seconds
    ```
 
 3. For production, ensure all required variables are set in your deployment environment.
-
-Note: The `.env` file is ignored by Git for security. Never commit sensitive credentials to version control.
